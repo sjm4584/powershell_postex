@@ -107,14 +107,39 @@ function rdp {
 	
 	write-host "<passw>" -NoNewline -ForegroundColor Yellow
 	write-host " >>> " -NoNewline -ForegroundColor Green
-	$passw = Read-Host -AsSecureString
+	# read in as plaintext so we can show users creds. #Jank
+	$passw_plain = Read-Host #-AsSecureString
+	# convert to pscred type so we can make the $creds tuple #Secureteh
+	$passw = $passw_plain | ConvertTo-SecureString -asPlainText -Force
 
 	# establish RDP session using janky mstsc because powershell RDP module isn't default installed
 	write-host "(run) >>> " -NoNewline -ForegroundColor Green
 	$command = Read-Host
 	if ($command -eq 'run') {
-		cmdkey /generic:$target /user:$uname /pass:$passw
-		mstsc /v:$target
+	
+		try {
+			cmdkey /generic:$target /user:$uname /pass:$passw
+			mstsc /v:$target
+			# change rating from 'bad' to 'good'
+			($csv = Import-CSV 'creds.csv' -Delimiter ',') |foreach {
+				if ($_.Hostname -eq $target -and $_.Username -eq $uname -and $_.Password -eq $passw_plain -and $_.Rating -eq "bad"){
+					$_.rating = "good"
+				}
+			}
+			$csv | Export-CSV 'creds.csv' -Delimiter ',' -NoType
+		}
+		catch {
+			$ErrorMessage = $_.Exception.Message
+			write-host "[+] $ErrorMessage" -ForegroundColor Red -BackgroundColor White
+			# change 'good' to 'bad'
+			($csv = Import-CSV 'creds.csv' -Delimiter ',') |foreach {
+				if ($_.Hostname -eq $target -and $_.Username -eq $uname -and $_.Password -eq $passw_plain -and $_.Rating -eq "good"){
+					$_.rating = "bad"
+				}
+			}
+			$csv | Export-CSV 'creds.csv' -Delimiter ',' -NoType
+			break
+		}
 	}
 }
 
