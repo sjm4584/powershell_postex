@@ -79,6 +79,49 @@ function remote_shell {
 	}
 }
 
+function file_upload {
+	write-host "[+] File Upload options: "
+	# read in options for interactive shell 
+	write-host "<target>" -NoNewline -ForegroundColor Yellow
+	write-host " >>> " -NoNewline -ForegroundColor Green
+	$target = Read-Host
+	
+	# creds are stored in creds.csv so let's deal with that bullshit now
+	if (Test-Path "creds.csv") {
+		# because fuck you that's why powershell god damnit.
+		$data = Import-CSV "creds.csv" | Where-Object {$_.hostname -eq $target}
+		if ($data -ne $NULL) {
+			write-host "[+] Stored Credentials for: " -NoNewline
+			write-host "$target" -ForegroundColor Magenta
+			$data | select-object | format-table -autosize
+		} else {
+			write-host "[!] There are no stored credentials for this target." -ForegroundColor Gray
+		}
+	}
+
+	write-host "<uname>" -NoNewline -ForegroundColor Yellow
+	write-host " >>> " -NoNewline -ForegroundColor Green
+	$uname = Read-Host
+	
+	write-host "<passw>" -NoNewline -ForegroundColor Yellow
+	write-host " >>> " -NoNewline -ForegroundColor Green
+	# read in as plaintext so we can show users creds. #Jank
+	$passw_plain = Read-Host #-AsSecureString
+	# convert to pscred type so we can make the $creds tuple #Secureteh
+	$passw = $passw_plain | ConvertTo-SecureString -asPlainText -Force
+	$creds = New-Object System.Management.Automation.PSCredential($uname, $passw)
+	
+	write-host "<src>" -NoNewline -ForegroundColor Yellow
+	write-host " >>> " -NoNewline -ForegroundColor Green
+	$local_file = Read-Host
+	
+	write-host "<dest>" -NoNewline -ForegroundColor Yellow
+	write-host " >>> " -NoNewline -ForegroundColor Green
+	$dest_file = Read-Host
+	
+	Copy-Item $local_file -Destination $dest_file #-Credential $creds
+}
+
 # Name: rdp
 # Purpose: establishes an RDP session to the victim using mstsc
 function rdp {
@@ -149,6 +192,7 @@ while ($true) {
 	write-host "[+] remote_shell"
 	write-host "[+] port_scan (NOT IMPLEMENTED"
 	write-host "[+] rdp"
+	write-host "[+] file_upload"
 
 	$choice = Read-Host ">>> "
 	
@@ -163,7 +207,10 @@ while ($true) {
 	elseif ($choice -eq 'rdp'){
 		echo "[2] rdp it is!"
 		rdp
-	} 
+	}
+	elseif ($choice -eq 'file_upload'){
+		file_upload
+	}
 	else {
 		break
 	}
